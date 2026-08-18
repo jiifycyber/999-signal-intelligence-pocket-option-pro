@@ -392,7 +392,7 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     final decision = duke?.decision ?? _direction(signal);
     final approved = duke?.tradeApproved ?? false;
 
-    final decisionColor = approved
+    final c = approved
         ? green
         : decision == 'BUY' || decision == 'CALL'
             ? green
@@ -432,630 +432,326 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
         : '${performance.winRate.toStringAsFixed(1)}%';
 
     return SafeArea(
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.35,
-            colors: [
-              Color(0xFF07304C),
-              Color(0xFF03101A),
-              Color(0xFF020811),
-            ],
-          ),
-        ),
-        child: Column(
-          children: [
-            // =========================
-            // MOBILE HEADER
-            // =========================
-            Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: const BoxDecoration(
-                color: Color(0xCC03101A),
-                border: Border(
-                  bottom: BorderSide(
-                    color: Color(0x3325D9FF),
+      child: Column(
+        children: [
+          Container(
+            height: 54,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            color: const Color(0xFF041320),
+            child: Row(
+              children: [
+                const Text(
+                  '999 SIGNAL',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-              ),
-              child: Row(
+                const SizedBox(width: 5),
+                const Text(
+                  'INTELLIGENCE 2.0',
+                  style: TextStyle(
+                    color: cyan,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  connected ? 'LIVE' : 'SYNC',
+                  style: TextStyle(
+                    color: connected ? green : amber,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 76),
+              child: Column(
                 children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: cyan.withValues(alpha: .55),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cyan.withValues(alpha: .15),
-                          blurRadius: 14,
-                        ),
-                      ],
-                    ),
-                    child: const Text(
-                      '9',
-                      style: TextStyle(
-                        color: cyan,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '999 SIGNAL',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: .5,
-                        ),
-                      ),
-                      Text(
-                        'INTELLIGENCE 2.0',
-                        style: TextStyle(
-                          color: cyan,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: (connected ? green : amber).withValues(alpha: .10),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            (connected ? green : amber).withValues(alpha: .35),
-                      ),
-                    ),
+                  _glass(
+                    padding: const EdgeInsets.all(10),
                     child: Row(
                       children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: connected ? green : amber,
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'LIVE PAIR',
+                                style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 8,
+                                ),
+                              ),
+                              _pairSelector(),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 5),
-                        Text(
-                          connected ? 'LIVE' : 'SYNC',
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'TIMEFRAME',
+                                style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 8,
+                                ),
+                              ),
+                              SizedBox(
+                                height: 30,
+                                child: _timeframeSelector(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _glass(
+                    glow: true,
+                    borderColor: c.withValues(alpha: .55),
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'AI OPPORTUNITY SCANNER',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              approved ? 'DUKE APPROVED' : 'DUKE HOLD',
+                              style: TextStyle(
+                                color: approved ? green : amber,
+                                fontSize: 7,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Text(
+                          '999 NETWORK LIVE ANALYSIS',
                           style: TextStyle(
-                            color: connected ? green : amber,
+                            color: green,
                             fontSize: 8,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                selectedPair.replaceAll('_', ' '),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              decision,
+                              style: TextStyle(
+                                color: c,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          price?.toString() ?? '--',
+                          style: const TextStyle(
+                            color: cyan,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _mobileStatusBox(
+                                'EXECUTION',
+                                executionState,
+                                executionColor,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _mobileStatusBox(
+                                'COUNTDOWN',
+                                signal == null ? '--' : '${remaining}s',
+                                cyan,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _mobileStatusBox(
+                                'SETUP SCORE',
+                                signal == null
+                                    ? '--'
+                                    : signal.confidence.toStringAsFixed(1),
+                                purple,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _showDukeResult(
+                                  scannerController.deepScan(selectedPair),
+                                ),
+                                child: const Text('DEEP SCAN'),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _openDukeChat,
+                                child: const Text('ASK DUKE'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => _showDukeRanking(
+                              scannerController.deepScanAll(),
+                            ),
+                            child: const Text('SCAN ALL LIVE MARKETS'),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          duke?.explanation ??
+                              'Duke is monitoring the live feed.',
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 9,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _glass(
+                    title: 'MEASURED PERFORMANCE',
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _mobileStat(
+                            'WIN RATE',
+                            measuredWinRate,
+                            green,
+                          ),
+                        ),
+                        Expanded(
+                          child: _mobileStat(
+                            'WINS',
+                            '${performance.wins}',
+                            green,
+                          ),
+                        ),
+                        Expanded(
+                          child: _mobileStat(
+                            'LOSSES',
+                            '${performance.losses}',
+                            red,
+                          ),
+                        ),
+                        Expanded(
+                          child: _mobileStat(
+                            'TIES',
+                            '${performance.breakeven}',
+                            amber,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _glass(
+                    title: 'TOP LIVE OPPORTUNITIES',
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: [
+                        for (final s in rows.take(15)) _mobileSignalRow(s),
+                        if (rows.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 28),
+                            child: Text(
+                              'Waiting for live scanner data...',
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 94),
-                child: Column(
-                  children: [
-                    // =========================
-                    // PAIR + TIMEFRAME
-                    // =========================
-                    _glass(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'LIVE PAIR',
-                                  style: TextStyle(
-                                    color: cyan,
-                                    fontSize: 7,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                _pairSelector(),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 42,
-                            color: Colors.white10,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'TIMEFRAME',
-                                  style: TextStyle(
-                                    color: cyan,
-                                    fontSize: 7,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                SizedBox(
-                                  height: 32,
-                                  child: _timeframeSelector(),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // =========================
-                    // MAIN SIGNAL CARD
-                    // =========================
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF08223A),
-                            Color(0xFF04131F),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: decisionColor.withValues(alpha: .38),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: decisionColor.withValues(alpha: .10),
-                            blurRadius: 22,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: cyan.withValues(alpha: .10),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.psychology_alt_outlined,
-                                  color: cyan,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 9),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'AI OPPORTUNITY SCANNER',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    Text(
-                                      '999 NETWORK LIVE ANALYSIS',
-                                      style: TextStyle(
-                                        color: green,
-                                        fontSize: 7,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  color: (approved ? green : amber)
-                                      .withValues(alpha: .08),
-                                  border: Border.all(
-                                    color: (approved ? green : amber)
-                                        .withValues(alpha: .28),
-                                  ),
-                                ),
-                                child: Text(
-                                  approved ? 'DUKE APPROVED' : 'DUKE HOLD',
-                                  style: TextStyle(
-                                    color: approved ? green : amber,
-                                    fontSize: 6.5,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      selectedPair.replaceAll('_', ' '),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      price?.toString() ?? '--',
-                                      style: const TextStyle(
-                                        color: cyan,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                decision,
-                                style: TextStyle(
-                                  color: decisionColor,
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: .5,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _mobileStatusBox(
-                                  'EXECUTION',
-                                  executionState,
-                                  executionColor,
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              Expanded(
-                                child: _mobileStatusBox(
-                                  'COUNTDOWN',
-                                  signal == null ? '--' : '${remaining}s',
-                                  cyan,
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              Expanded(
-                                child: _mobileStatusBox(
-                                  'SETUP SCORE',
-                                  signal == null
-                                      ? '--'
-                                      : signal.confidence.toStringAsFixed(1),
-                                  purple,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SizedBox(
-                                  height: 44,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => _showDukeResult(
-                                      scannerController.deepScan(
-                                        selectedPair,
-                                      ),
-                                    ),
-                                    icon: const Icon(
-                                      Icons.radar,
-                                      size: 17,
-                                    ),
-                                    label: const Text('DEEP SCAN'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: cyan,
-                                      side: BorderSide(
-                                        color: cyan.withValues(alpha: .45),
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: SizedBox(
-                                  height: 44,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _openDukeChat,
-                                    icon: const Icon(
-                                      Icons.smart_toy_outlined,
-                                      size: 17,
-                                    ),
-                                    label: const Text('ASK DUKE'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: purple,
-                                      side: BorderSide(
-                                        color: purple.withValues(alpha: .45),
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            height: 46,
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: () => _showDukeRanking(
-                                scannerController.deepScanAll(),
-                              ),
-                              icon: const Icon(
-                                Icons.travel_explore,
-                                size: 18,
-                              ),
-                              label: const Text(
-                                'SCAN ALL LIVE MARKETS',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: .3,
-                                ),
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: cyan.withValues(alpha: .16),
-                                foregroundColor: Colors.white,
-                                side: BorderSide(
-                                  color: cyan.withValues(alpha: .60),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(11),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 11),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(9),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: .18),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.white10,
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.shield_outlined,
-                                  color: cyan,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 7),
-                                Expanded(
-                                  child: Text(
-                                    duke?.explanation ??
-                                        'Duke is monitoring the live feed.',
-                                    style: const TextStyle(
-                                      color: Colors.white60,
-                                      fontSize: 8.5,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // =========================
-                    // PERFORMANCE
-                    // =========================
-                    _glass(
-                      title: 'PERFORMANCE SUMMARY',
-                      padding: const EdgeInsets.fromLTRB(
-                        10,
-                        12,
-                        10,
-                        12,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _mobileStat(
-                              'WIN RATE',
-                              measuredWinRate,
-                              green,
-                            ),
-                          ),
-                          _mobileDivider(),
-                          Expanded(
-                            child: _mobileStat(
-                              'WINS',
-                              '${performance.wins}',
-                              green,
-                            ),
-                          ),
-                          _mobileDivider(),
-                          Expanded(
-                            child: _mobileStat(
-                              'LOSSES',
-                              '${performance.losses}',
-                              red,
-                            ),
-                          ),
-                          _mobileDivider(),
-                          Expanded(
-                            child: _mobileStat(
-                              'TIES',
-                              '${performance.breakeven}',
-                              amber,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // =========================
-                    // OPPORTUNITIES
-                    // =========================
-                    _glass(
-                      title: 'TOP LIVE OPPORTUNITIES',
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      child: Column(
-                        children: [
-                          for (final s in rows.take(15)) _mobileSignalRow(s),
-                          if (rows.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 34),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.radar,
-                                    color: Colors.white24,
-                                    size: 27,
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Waiting for live scanner data...',
-                                    style: TextStyle(
-                                      color: Colors.white38,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
+          ),
+          Container(
+            height: 62,
+            color: const Color(0xFF041320),
+            child: Row(
+              children: [
+                _mobileNav(Icons.radar, 'SCAN', _openScannerModule),
+                _mobileNav(
+                  Icons.currency_exchange,
+                  'MARKETS',
+                  _openMarketsModule,
                 ),
-              ),
-            ),
-
-            // =========================
-            // MOBILE NAV
-            // =========================
-            Container(
-              height: 72,
-              decoration: const BoxDecoration(
-                color: Color(0xF203101A),
-                border: Border(
-                  top: BorderSide(
-                    color: Color(0x3325D9FF),
-                  ),
+                _mobileNav(
+                  Icons.smart_toy_outlined,
+                  'DUKE',
+                  _openDukeChat,
                 ),
-              ),
-              child: Row(
-                children: [
-                  _mobileNav(
-                    Icons.radar,
-                    'SCAN',
-                    _openScannerModule,
-                    active: true,
-                  ),
-                  _mobileNav(
-                    Icons.currency_exchange,
-                    'MARKETS',
-                    _openMarketsModule,
-                  ),
-                  _mobileNav(
-                    Icons.smart_toy_outlined,
-                    'DUKE',
-                    _openDukeChat,
-                  ),
-                  _mobileNav(
-                    Icons.track_changes,
-                    'TRACKER',
-                    _openTrackerModule,
-                  ),
-                  _mobileNav(
-                    Icons.tune,
-                    'TOOLS',
-                    _openToolsModule,
-                  ),
-                ],
-              ),
+                _mobileNav(
+                  Icons.track_changes,
+                  'TRACKER',
+                  _openTrackerModule,
+                ),
+                _mobileNav(
+                  Icons.tune,
+                  'TOOLS',
+                  _openToolsModule,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _mobileDivider() {
-    return Container(
-      width: 1,
-      height: 28,
-      color: Colors.white10,
     );
   }
 
@@ -1065,16 +761,13 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     Color color,
   ) {
     return Container(
-      height: 62,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 8,
-      ),
+      height: 50,
+      padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .045),
-        borderRadius: BorderRadius.circular(10),
+        color: panel2,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: color.withValues(alpha: .28),
+          color: color.withValues(alpha: .25),
         ),
       ),
       child: Column(
@@ -1082,13 +775,9 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
         children: [
           Text(
             label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white38,
-              fontSize: 6.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .5,
+              color: Colors.white30,
+              fontSize: 6,
             ),
           ),
           const Spacer(),
@@ -1098,7 +787,7 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1112,32 +801,25 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     String value,
     Color color,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        children: [
-          Text(
-            value,
-            maxLines: 1,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
           ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            maxLines: 1,
-            style: const TextStyle(
-              color: Colors.white38,
-              fontSize: 6.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .4,
-            ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white38,
+            fontSize: 6,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1157,52 +839,33 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     final remaining = (60 - s.age.inSeconds).clamp(0, 60);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: () {
-        setState(() => selectedPair = s.symbol);
-      },
+      onTap: () => setState(() => selectedPair = s.symbol),
       onLongPress: () {
         setState(() => selectedPair = s.symbol);
-        _showDukeResult(
-          scannerController.deepScan(s.symbol),
-        );
+        _showDukeResult(scannerController.deepScan(s.symbol));
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(9),
-          color: Colors.white.withValues(alpha: .018),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: .05),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.white10),
           ),
         ),
         child: Row(
           children: [
-            const Icon(
-              Icons.star_border_rounded,
-              color: Colors.white30,
-              size: 17,
-            ),
-            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     s.symbol.replaceAll('_', ' '),
-                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 2),
                   Text(
                     '${remaining}s remaining',
                     style: const TextStyle(
@@ -1213,51 +876,29 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
                 ],
               ),
             ),
-            Container(
-              constraints: const BoxConstraints(
-                minWidth: 56,
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 7,
-                vertical: 5,
-              ),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: .07),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: color.withValues(alpha: .35),
-                ),
-              ),
+            SizedBox(
+              width: 58,
               child: Text(
                 decision,
                 textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
-                  fontSize: 8,
+                  fontSize: 9,
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
             SizedBox(
-              width: 44,
+              width: 48,
               child: Text(
                 s.confidence.toStringAsFixed(1),
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                   color: cyan,
-                  fontSize: 10,
+                  fontSize: 9,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-            ),
-            const SizedBox(width: 5),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.white24,
-              size: 17,
             ),
           ],
         ),
@@ -1268,45 +909,25 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
   Widget _mobileNav(
     IconData icon,
     String label,
-    VoidCallback onTap, {
-    bool active = false,
-  }) {
+    VoidCallback onTap,
+  ) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.symmetric(
-            horizontal: 3,
-            vertical: 8,
-          ),
-          decoration: BoxDecoration(
-            color: active ? cyan.withValues(alpha: .08) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: active
-                ? Border.all(
-                    color: cyan.withValues(alpha: .22),
-                  )
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: active ? cyan : Colors.white54,
-                size: 20,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: cyan, size: 19),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 7,
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active ? cyan : Colors.white54,
-                  fontSize: 7,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

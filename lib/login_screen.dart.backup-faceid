@@ -102,47 +102,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Text(loading ? 'Signing in...' : 'LOGIN'),
                       ),
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // FACE ID / PASSKEY LOGIN
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: loading
-                            ? null
-                            : () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Face ID security detected. Passkey connection is being configured.',
-                                    ),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                        icon: const Icon(
-                          Icons.face,
-                          size: 20,
-                        ),
-                        label: const Text(
-                          'FACE ID',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF00E5FF),
-                          side: const BorderSide(
-                            color: Color(0xFF00E5FF),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),

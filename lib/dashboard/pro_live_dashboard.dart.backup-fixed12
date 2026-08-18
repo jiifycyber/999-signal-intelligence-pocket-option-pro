@@ -95,9 +95,6 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
   final Map<String, ScanSignal> lastSignalBySymbol = {};
   bool refreshTop12Requested = false;
 
-  DateTime? top12LockedAt;
-  static const Duration top12LockDuration = Duration(seconds: 60);
-
   String selectedPair = 'EURUSD';
   String timeframe = 'M1';
   String pairFilter = 'TOP 40';
@@ -127,24 +124,21 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
           lastSignalBySymbol[_normalize(signal.symbol)] = signal;
         }
 
-        // Initial dashboard load: lock the strongest 12.
+        // Initial dashboard load: wait until at least 12 markets exist,
+        // then lock the strongest 12.
         if (lockedTop12Symbols.isEmpty && signals.length >= 12) {
           _lockTop12(signals);
         }
 
-        // Manual rescan overrides the timer immediately.
+        // Manual SCAN ALL LIVE MARKETS requests a fresh Top 12.
         if (refreshTop12Requested && signals.length >= 12) {
           _lockTop12(signals);
           refreshTop12Requested = false;
-        } else if (signals.length >= 12 &&
-            top12LockedAt != null &&
-            DateTime.now().difference(top12LockedAt!) >= top12LockDuration) {
-          // After 60 seconds, allow a fresh strongest Top 12.
-          _lockTop12(signals);
         }
 
-        // Never automatically change the pair the user is viewing.
-        // Scanner updates may change data, but not the selected pair.
+        if (_signalFor(selectedPair) == null && rankedSignals.isNotEmpty) {
+          selectedPair = rankedSignals.first.symbol;
+        }
       });
     });
 
@@ -236,16 +230,19 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
       ..addAll(
         ranked.take(12).map((signal) => _normalize(signal.symbol)),
       );
-
-    top12LockedAt = DateTime.now();
   }
 
   List<ScanSignal> get lockedTop12Signals {
-    // lockedTop12Symbols defines the permanent visual order.
-    return lockedTop12Symbols
-        .map((symbol) => lastSignalBySymbol[_normalize(symbol)])
-        .whereType<ScanSignal>()
-        .toList(growable: false);
+    final rows = <ScanSignal>[];
+
+    for (final symbol in lockedTop12Symbols) {
+      final signal = lastSignalBySymbol[_normalize(symbol)];
+      if (signal != null) {
+        rows.add(signal);
+      }
+    }
+
+    return rows;
   }
 
   String _category(String symbol) {
@@ -3122,11 +3119,29 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
   }
 
   Widget _watchlist() {
-    // LOCKED WATCHLIST:
-    // Pair names and row positions never move because confidence changes.
-    // Favorites remain favorites, but favoriting a pair does NOT reorder rows.
-    // A new Top 12 is selected only after a manual market rescan.
-    final rows = lockedTop12Signals.take(12).toList(growable: false);
+    final pinned = <ScanSignal>[];
+    final automatic = <ScanSignal>[];
+    final seen = <String>{};
+
+    for (final signal in rankedSignals) {
+      final symbol = _normalize(signal.symbol);
+
+      if (watchlist.contains(symbol) && seen.add(symbol)) {
+        pinned.add(signal);
+      }
+    }
+
+    for (final signal in rankedSignals) {
+      if (pinned.length + automatic.length >= 8) break;
+
+      final symbol = _normalize(signal.symbol);
+
+      if (seen.add(symbol)) {
+        automatic.add(signal);
+      }
+    }
+
+    final rows = [...pinned, ...automatic].take(8).toList();
 
     return _glass(
       borderColor: green.withValues(alpha: 0.40),
@@ -3348,7 +3363,7 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
                     ),
                     const Spacer(),
                     Text(
-                      '${watchlist.length} PINNED',
+                      '${pinned.length} PINNED',
                       style: const TextStyle(
                         color: amber,
                         fontSize: 4.8,

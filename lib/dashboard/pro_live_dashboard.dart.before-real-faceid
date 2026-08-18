@@ -7,7 +7,6 @@ import '../models/scan_signal.dart';
 import '../ai/agent_duke_master_engine.dart';
 import '../services/scanner_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:passkeys/authenticator.dart';
 
 class ProLiveDashboard extends StatefulWidget {
   const ProLiveDashboard({super.key});
@@ -341,63 +340,6 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     return amber;
   }
 
-  Future<void> _registerFaceId() async {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-
-      if (user == null) {
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Please log in normally before setting up Face ID.',
-            ),
-          ),
-        );
-        return;
-      }
-
-      final authenticator = PasskeyAuthenticator();
-
-      await Supabase.instance.client.auth.registerPasskey(
-        authenticator,
-        friendlyName: '999 Intelligence Pro Face ID',
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Face ID passkey setup complete.',
-          ),
-          duration: Duration(seconds: 3),
-        ),
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Face ID setup failed: ${e.message}',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Face ID setup failed: $e',
-          ),
-        ),
-      );
-    }
-  }
-
   void _setMode(bool live) {
     if (live) {
       scannerController.marketDataService.setTimeframe(timeframe);
@@ -627,7 +569,16 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
                   // FACE ID
                   InkWell(
                     borderRadius: BorderRadius.circular(18),
-                    onTap: _registerFaceId,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Face ID setup ready — passkey connection is next.',
+                          ),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 7,

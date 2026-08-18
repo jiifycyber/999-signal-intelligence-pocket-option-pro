@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:passkeys/authenticator.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,35 +30,6 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => errorMessage = e.message);
     } catch (_) {
       setState(() => errorMessage = 'Login failed. Please try again.');
-    } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
-    }
-  }
-
-  Future<void> signInWithFaceId() async {
-    setState(() {
-      loading = true;
-      errorMessage = null;
-    });
-
-    try {
-      final authenticator = PasskeyAuthenticator();
-
-      await Supabase.instance.client.auth.signInWithPasskey(
-        authenticator,
-      );
-    } on AuthException catch (e) {
-      if (mounted) {
-        setState(() => errorMessage = e.message);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          errorMessage = 'Face ID / passkey login failed: $e';
-        });
-      }
     } finally {
       if (mounted) {
         setState(() => loading = false);
@@ -139,7 +109,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: loading ? null : signInWithFaceId,
+                        onPressed: loading
+                            ? null
+                            : () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Face ID security detected. Passkey connection is being configured.',
+                                    ),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
                         icon: const Icon(
                           Icons.face,
                           size: 20,

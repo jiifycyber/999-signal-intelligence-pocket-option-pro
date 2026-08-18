@@ -1,0 +1,16 @@
+
+# Pocket Option secrets
+.env
+backend/.env
+.private/
+.venv/
+__pycache__/
+*.pyc
+
+build/
+.dart_tool/
+*.dill
+*.track.dill
+.local_backups/
+lib/main.before_*.dart
+external/

@@ -65,12 +65,6 @@ class _NexusDashboardState extends State<NexusDashboard> {
 
   List<ScanSignal> liveSignals = [];
   final Map<String, double> latestPrices = {};
-
-  List<String> get _liveScanPairs {
-    final pairs = latestPrices.keys.toList();
-    pairs.sort();
-    return pairs;
-  }
   bool scannerConnected = false;
   MarketMode marketMode = MarketMode.demo;
 
@@ -1122,7 +1116,7 @@ class _NexusDashboardState extends State<NexusDashboard> {
   }
 
   Future<void> _openPocketPairExplorer(BuildContext context) async {
-    String filter = 'ALL';
+    String filter = 'TOP 40';
     String search = '';
 
     String categoryFor(String symbol) {
@@ -1206,6 +1200,10 @@ class _NexusDashboardState extends State<NexusDashboard> {
       pairs.sort(
         (a, b) => rankFor(b).compareTo(rankFor(a)),
       );
+
+      if (filter == 'TOP 40' && pairs.length > 40) {
+        pairs = pairs.take(40).toList();
+      }
 
       return pairs;
     }

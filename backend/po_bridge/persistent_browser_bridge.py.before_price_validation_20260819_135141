@@ -99,6 +99,7 @@ def as_price(value: Any) -> Optional[float]:
         if number <= 0:
             return None
 
+        # Avoid treating obvious timestamps/IDs as prices.
         if number > 10_000_000:
             return None
 
@@ -106,52 +107,6 @@ def as_price(value: Any) -> Optional[float]:
 
     except Exception:
         return None
-
-
-def is_plausible_market_price(
-    symbol: str,
-    price: float,
-) -> bool:
-    """
-    Reject payout percentages, timestamps, IDs and other Pocket Option
-    numeric fields before they can contaminate scanner candles.
-    """
-
-    if not symbol:
-        return False
-
-    core = symbol.replace("_OTC", "").upper()
-
-    # Gold
-    if core == "XAUUSD":
-        if not (100.0 <= price <= 20_000.0):
-            return False
-
-    # Silver
-    elif core == "XAGUSD":
-        if not (1.0 <= price <= 500.0):
-            return False
-
-    # Normal six-letter FX pairs
-    elif len(core) == 6 and core.isalpha():
-        if core.endswith("JPY"):
-            if not (20.0 <= price <= 500.0):
-                return False
-        else:
-            if not (0.05 <= price <= 5.0):
-                return False
-
-    # If we already have a real price for this symbol, reject absurd jumps.
-    previous = state.latest_prices.get(symbol)
-
-    if previous is not None and previous > 0:
-        change = abs(price - previous) / previous
-
-        # A 5% instantaneous FX move is not a normal tick.
-        if change > 0.05:
-            return False
-
-    return True
 
 
 async def broadcast(payload: dict):
@@ -190,15 +145,6 @@ async def emit_price(
     price = as_price(price)
 
     if price is None:
-        return
-
-    if not is_plausible_market_price(symbol, price):
-        print(
-            "PO REJECTED NON-PRICE:",
-            symbol,
-            price,
-            flush=True,
-        )
         return
 
     # Prevent identical duplicate packets flooding the scanner.
@@ -314,27 +260,16 @@ async def walk(
 
             if possible_symbol:
 
-                # Pocket Option tick arrays commonly use:
-                # [symbol, timestamp, price]
-                # [symbol, price]
-                #
-                # Never choose the last arbitrary number because fields
-                # such as payout percentages can appear after the price.
-                possible_price = None
-                possible_timestamp = None
+                # Prefer last numeric item as potential price.
+                for item in reversed(obj[1:]):
+                    possible_price = as_price(item)
 
-                if len(obj) >= 3:
-                    possible_timestamp = obj[1]
-                    possible_price = as_price(obj[2])
-                elif len(obj) == 2:
-                    possible_price = as_price(obj[1])
-
-                if possible_price is not None:
-                    await emit_price(
-                        possible_symbol,
-                        possible_price,
-                        possible_timestamp,
-                    )
+                    if possible_price is not None:
+                        await emit_price(
+                            possible_symbol,
+                            possible_price,
+                        )
+                        break
 
         for value in obj:
             await walk(

@@ -101,7 +101,7 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
 
   String selectedPair = 'EURUSD';
   String timeframe = 'M1';
-  String pairFilter = 'TOP 40';
+  String pairFilter = 'ALL';
   String search = '';
   String selectedNav = 'AI SCANNER';
 
@@ -316,10 +316,6 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
 
     if (q.isNotEmpty) {
       rows = rows.where((s) => _normalize(s.symbol).contains(q)).toList();
-    }
-
-    if (pairFilter == 'TOP 40' && rows.length > 40) {
-      rows = rows.take(40).toList();
     }
 
     return rows;

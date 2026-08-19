@@ -18,38 +18,52 @@ class AgentDukeScannerBridge {
 
     final confidence = signal.confidence.clamp(0.0, 100.0).toDouble();
 
-    final trendStrength = _signedScore(signal.trend, directionBias, confidence);
+    // -----------------------------------------------------------
+    // IMPORTANT:
+    //
+    // OLD VERSION:
+    // M1 / M5 / M15 were fabricated by multiplying one signal.
+    //
+    // NEW VERSION:
+    // ScannerEngine supplies independently calculated timeframe
+    // scores from actual M1, aggregated M5 and aggregated M15
+    // Pocket Option candle data.
+    // -----------------------------------------------------------
 
-    final momentumStrength =
-        _signedScore(signal.momentum, directionBias, confidence);
+    double signedVolatility(double timeframeScore) {
+      if (timeframeScore > 0) {
+        return signal.volatilityScore;
+      }
 
-    final structureStrength =
-        _setupScore(signal.setup, directionBias, confidence);
+      if (timeframeScore < 0) {
+        return -signal.volatilityScore;
+      }
 
-    final volatilityStrength = (confidence * 0.70).clamp(0.0, 100.0).toDouble();
+      return signal.volatilityScore * directionBias;
+    }
 
     final oneMinute = DukeTimeframeInput(
       timeframe: '1M',
-      trend: trendStrength * 0.90,
-      momentum: momentumStrength,
-      structure: structureStrength * 0.85,
-      volatility: volatilityStrength,
+      trend: signal.m1Score,
+      momentum: signal.m1Score,
+      structure: signal.structureScore,
+      volatility: signedVolatility(signal.m1Score),
     );
 
     final fiveMinute = DukeTimeframeInput(
       timeframe: '5M',
-      trend: trendStrength,
-      momentum: momentumStrength * 0.95,
-      structure: structureStrength,
-      volatility: volatilityStrength,
+      trend: signal.m5Score,
+      momentum: signal.m5Score,
+      structure: signal.structureScore * 0.70,
+      volatility: signedVolatility(signal.m5Score),
     );
 
     final fifteenMinute = DukeTimeframeInput(
       timeframe: '15M',
-      trend: trendStrength * 1.05,
-      momentum: momentumStrength * 0.90,
-      structure: structureStrength,
-      volatility: volatilityStrength,
+      trend: signal.m15Score,
+      momentum: signal.m15Score,
+      structure: signal.structureScore * 0.50,
+      volatility: signedVolatility(signal.m15Score),
     );
 
     return duke.analyze(
@@ -60,51 +74,11 @@ class AgentDukeScannerBridge {
         fiveMinute: fiveMinute,
         fifteenMinute: fifteenMinute,
         spreadQuality: confidence,
-        structureQuality: structureStrength.abs(),
-        trendStrength: trendStrength,
-        volatility: volatilityStrength,
+        structureQuality:
+            signal.structureScore.abs().clamp(0.0, 100.0).toDouble(),
+        trendStrength: signal.m1Score,
+        volatility: signal.volatilityScore.clamp(0.0, 100.0).toDouble(),
       ),
     );
-  }
-
-  double _signedScore(
-    String value,
-    double directionBias,
-    double confidence,
-  ) {
-    final text = value.toLowerCase();
-    double strength = confidence;
-
-    if (text.contains('strong')) strength += 8;
-    if (text.contains('weak')) strength -= 15;
-
-    if (text.contains('bull')) {
-      return strength.abs().clamp(0.0, 100.0).toDouble();
-    }
-
-    if (text.contains('bear')) {
-      return -strength.abs().clamp(0.0, 100.0).toDouble();
-    }
-
-    return (strength * directionBias).clamp(-100.0, 100.0).toDouble();
-  }
-
-  double _setupScore(
-    String setup,
-    double directionBias,
-    double confidence,
-  ) {
-    final text = setup.toLowerCase();
-    double score = confidence;
-
-    if (text.contains('breakout') ||
-        text.contains('continuation') ||
-        text.contains('reversal') ||
-        text.contains('liquidity') ||
-        text.contains('structure')) {
-      score += 5;
-    }
-
-    return (score * directionBias).clamp(-100.0, 100.0).toDouble();
   }
 }

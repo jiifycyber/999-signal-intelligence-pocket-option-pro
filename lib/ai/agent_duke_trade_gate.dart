@@ -36,66 +36,70 @@ class DukeTradeGateResult {
   });
 }
 
+/// The trade gate no longer has authority to erase Duke's direction.
+///
+/// It can report quality warnings.
+/// It cannot convert BUY/SELL into WAIT.
 class AgentDukeTradeGate {
   const AgentDukeTradeGate();
 
-  DukeTradeGateResult evaluate(DukeTradeGateInput input) {
+  DukeTradeGateResult evaluate(
+    DukeTradeGateInput input,
+  ) {
     final reasons = <String>[];
 
     final volatilityQuality =
         (100.0 - (input.volatility - 65.0).abs()).clamp(0.0, 100.0).toDouble();
 
-    final qualityScore = ((input.confidence * 0.30) +
-            (input.trendStrength.abs() * 0.18) +
-            (input.spreadQuality * 0.12) +
-            (input.structureQuality * 0.18) +
+    final qualityScore = ((input.confidence * 0.35) +
+            (input.trendStrength.abs() * 0.20) +
+            (input.spreadQuality * 0.10) +
+            (input.structureQuality * 0.15) +
             (volatilityQuality * 0.10) +
-            ((input.multiTimeframeAligned ? 100.0 : 55.0) * 0.12))
+            ((input.multiTimeframeAligned ? 100.0 : 60.0) * 0.10))
         .clamp(0.0, 100.0)
         .toDouble();
 
-    if (input.proposedDecision == 'WAIT') {
-      reasons.add('No directional setup is currently active.');
-    }
-
-    if (input.confidence < 52) {
-      reasons.add('Combined confidence is still too weak.');
-    }
-
     if (!input.multiTimeframeAligned) {
-      reasons.add('Timeframe alignment is partial.');
+      reasons.add(
+        'Timeframes disagree; M1 forecast remains active.',
+      );
     }
 
     if (input.trendStrength.abs() < 25) {
-      reasons.add('Trend contribution is weak.');
+      reasons.add(
+        'Trend edge is weak; confidence reduced.',
+      );
     }
 
     if (input.structureQuality < 45) {
-      reasons.add('Structure contribution is weak.');
+      reasons.add(
+        'Structure edge is weak; confidence reduced.',
+      );
     }
 
     if (input.spreadQuality < 35) {
-      reasons.add('Execution quality is unacceptable.');
+      reasons.add(
+        'Spread/execution quality is weak.',
+      );
     }
 
     if (input.volatility > 95) {
-      reasons.add('Volatility is abnormally high.');
+      reasons.add(
+        'Volatility is unusually high.',
+      );
     }
 
-    if (qualityScore < 56) {
-      reasons.add('Combined quality score is below baseline.');
-    }
-
-    final approved = input.proposedDecision != 'WAIT' &&
-        input.confidence >= 52 &&
-        input.spreadQuality >= 35 &&
-        input.volatility <= 95 &&
-        qualityScore >= 56;
+    final validDecision =
+        input.proposedDecision == 'BUY' || input.proposedDecision == 'SELL';
 
     return DukeTradeGateResult(
       symbol: input.symbol,
-      finalDecision: approved ? input.proposedDecision : 'WAIT',
-      tradeApproved: approved,
+
+      // Never replace a valid directional forecast with WAIT.
+      finalDecision: validDecision ? input.proposedDecision : 'BUY',
+
+      tradeApproved: validDecision,
       qualityScore: qualityScore,
       reasons: reasons,
     );

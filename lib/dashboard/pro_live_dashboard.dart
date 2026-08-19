@@ -158,6 +158,13 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
 
           latestPrices[symbol] = quote.price;
 
+          if (symbol == _normalize(selectedPair)) {
+            debugPrint(
+              'LIVE TICK ${DateTime.now().toIso8601String()} '
+              '$symbol = ${quote.price}',
+            );
+          }
+
           final history = histories.putIfAbsent(symbol, () => <double>[]);
           history.add(quote.price);
 
@@ -2062,7 +2069,9 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Text(
-                          signal.entry.toString(),
+                          (latestPrices[_normalize(signal.symbol)] ??
+                                  signal.entry)
+                              .toString(),
                           style: const TextStyle(
                             color: cyan,
                             fontSize: 10,
@@ -2481,41 +2490,252 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
       return;
     }
 
+    final normalized = _normalize(result.symbol);
+
+    final signal =
+        lastSignalBySymbol[normalized] ?? lastSignalBySymbol[result.symbol];
+
+    // Lock the time this Deep Scan was opened.
+    // Time is now used only to measure signal age.
+    final scanTime = DateTime.now();
+
+    String priceText(double? value) {
+      if (value == null || !value.isFinite) {
+        return '--';
+      }
+
+      if (result.symbol.contains('JPY')) {
+        return value.toStringAsFixed(3);
+      }
+
+      if (value.abs() >= 1000) {
+        return value.toStringAsFixed(2);
+      }
+
+      if (value.abs() >= 100) {
+        return value.toStringAsFixed(3);
+      }
+
+      return value.toStringAsFixed(5);
+    }
+
+    String durationText(int totalSeconds) {
+      final safe = totalSeconds < 0 ? 0 : totalSeconds;
+
+      final minutes = safe ~/ 60;
+      final seconds = safe % 60;
+
+      return '${minutes.toString().padLeft(2, '0')}:'
+          '${seconds.toString().padLeft(2, '0')}';
+    }
+
     _showFunctionWindow(
       title: 'AGENT DUKE DEEP SCAN • ${result.symbol}',
       width: 700,
-      child: ListView(
-        children: [
-          _functionMetric(
-            'DECISION',
-            result.decision,
-            result.tradeApproved ? green : amber,
-          ),
-          _functionMetric(
-            'SETUP SCORE',
-            result.confidence.toStringAsFixed(1),
-            cyan,
-          ),
-          _functionMetric(
-            'QUALITY SCORE',
-            result.qualityScore.toStringAsFixed(1),
-            purple,
-          ),
-          _functionMetric(
-            'TRADE GATE',
-            result.tradeApproved ? 'APPROVED' : 'HOLD',
-            result.tradeApproved ? green : red,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            result.explanation,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              height: 1.5,
-            ),
-          ),
-        ],
+      child: StreamBuilder<int>(
+        stream: Stream<int>.periodic(
+          const Duration(milliseconds: 500),
+          (value) => value,
+        ),
+        initialData: 0,
+        builder: (context, snapshot) {
+          final now = DateTime.now();
+
+          final currentPrice = latestPrices[normalized] ??
+              latestPrices[result.symbol] ??
+              signal?.entry;
+
+          final fullHistory =
+              histories[normalized] ?? histories[result.symbol] ?? <double>[];
+
+          // Use recent market movement rather than the entire stored history.
+          final recentHistory = fullHistory.length > 60
+              ? fullHistory.sublist(fullHistory.length - 60)
+              : List<double>.from(fullHistory);
+
+          // Advanced structural values calculated by ScannerEngine.
+          double? support = signal?.support;
+          double? resistance = signal?.resistance;
+          double? minEntry = signal?.minEntry;
+          double? maxEntry = signal?.maxEntry;
+
+          // Legacy raw-price history is startup fallback only.
+          if ((support == null ||
+                  resistance == null ||
+                  minEntry == null ||
+                  maxEntry == null) &&
+              recentHistory.isNotEmpty) {
+            final legacySupport = recentHistory.reduce(
+              (a, b) => a < b ? a : b,
+            );
+
+            final legacyResistance = recentHistory.reduce(
+              (a, b) => a > b ? a : b,
+            );
+
+            final range = legacyResistance - legacySupport;
+
+            support ??= legacySupport;
+            resistance ??= legacyResistance;
+
+            if (range > 0) {
+              if (result.decision == 'BUY') {
+                minEntry ??= legacySupport + (range * 0.15);
+                maxEntry ??= legacySupport + (range * 0.45);
+              } else if (result.decision == 'SELL') {
+                minEntry ??= legacyResistance - (range * 0.45);
+                maxEntry ??= legacyResistance - (range * 0.15);
+              }
+            }
+          }
+
+          // Fallback while very little history has accumulated.
+          if (currentPrice != null && (minEntry == null || maxEntry == null)) {
+            final fallbackDistance = result.symbol.contains('JPY')
+                ? 0.020
+                : currentPrice.abs() >= 1000
+                    ? currentPrice * 0.00020
+                    : 0.00020;
+
+            minEntry = currentPrice - fallbackDistance;
+            maxEntry = currentPrice + fallbackDistance;
+
+            support ??= minEntry;
+            resistance ??= maxEntry;
+          }
+
+          final signalAge = now.difference(scanTime).inSeconds;
+
+          // For an M1 setup, don't leave an old analysis
+          // active indefinitely.
+          final stale = signalAge >= 300;
+
+          late final String status;
+          late final Color statusColor;
+
+          if (stale) {
+            status = 'RESCAN - SETUP STALE';
+            statusColor = red;
+          } else if (currentPrice == null ||
+              minEntry == null ||
+              maxEntry == null) {
+            status = 'WAITING FOR LIVE PRICE';
+            statusColor = amber;
+          } else if (currentPrice >= minEntry && currentPrice <= maxEntry) {
+            status = 'ENTRY ZONE';
+            statusColor = green;
+          } else if (result.decision == 'BUY') {
+            if (currentPrice > maxEntry) {
+              status = 'ABOVE ZONE - WAIT FOR PULLBACK';
+              statusColor = amber;
+            } else {
+              status = 'BELOW ZONE - WAIT FOR PRICE';
+              statusColor = cyan;
+            }
+          } else if (result.decision == 'SELL') {
+            if (currentPrice < minEntry) {
+              status = 'BELOW ZONE - DO NOT CHASE';
+              statusColor = amber;
+            } else {
+              status = 'ABOVE ZONE - WAIT FOR PRICE';
+              statusColor = cyan;
+            }
+          } else {
+            status = 'RESCAN';
+            statusColor = amber;
+          }
+
+          return ListView(
+            children: [
+              _functionMetric(
+                'DECISION',
+                result.decision,
+                result.decision == 'BUY'
+                    ? green
+                    : result.decision == 'SELL'
+                        ? red
+                        : amber,
+              ),
+              _functionMetric(
+                'CURRENT PRICE',
+                priceText(currentPrice),
+                cyan,
+              ),
+              _functionMetric(
+                'SUPPORT',
+                priceText(support),
+                green,
+              ),
+              _functionMetric(
+                'RESISTANCE',
+                priceText(resistance),
+                red,
+              ),
+              _functionMetric(
+                'MIN ENTRY PRICE',
+                priceText(minEntry),
+                cyan,
+              ),
+              _functionMetric(
+                'MAX ENTRY PRICE',
+                priceText(maxEntry),
+                cyan,
+              ),
+              _functionMetric(
+                'ENTRY STATUS',
+                status,
+                statusColor,
+              ),
+              _functionMetric(
+                'SIGNAL AGE',
+                durationText(signalAge),
+                signalAge >= 240 ? amber : Colors.white70,
+              ),
+              _functionMetric(
+                'CONFIDENCE',
+                '${result.confidence.toStringAsFixed(1)}%',
+                cyan,
+              ),
+              _functionMetric(
+                'QUALITY SCORE',
+                result.qualityScore.toStringAsFixed(1),
+                purple,
+              ),
+              _functionMetric(
+                'TRADE GATE',
+                result.tradeApproved ? 'APPROVED' : 'HOLD',
+                result.tradeApproved ? green : red,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                stale
+                    ? 'This setup is more than 5 minutes old. '
+                        'Run a fresh Deep Scan.'
+                    : status == 'ENTRY ZONE'
+                        ? 'Price is inside Duke\'s calculated entry zone. '
+                            'Recheck the live chart and market structure '
+                            'before execution.'
+                        : 'Duke is waiting for price to reach the '
+                            'calculated entry zone.',
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                result.explanation,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

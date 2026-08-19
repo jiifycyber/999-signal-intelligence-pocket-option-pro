@@ -14,10 +14,10 @@ class DukeTimeframeInput {
   });
 
   double get score =>
-      (trend * 0.35) +
-      (momentum * 0.30) +
-      (structure * 0.25) +
-      (volatility * 0.10);
+      (trend * 0.38) +
+      (momentum * 0.34) +
+      (structure * 0.20) +
+      (volatility * 0.08);
 }
 
 class DukeMultiTimeframeResult {
@@ -44,6 +44,12 @@ class DukeMultiTimeframeResult {
   });
 }
 
+/// 999 aggressive M1-first forecast.
+///
+/// M1 carries 70% of the directional decision.
+/// M5 and M15 provide context instead of permission.
+///
+/// There is no ±38 qualification threshold.
 class AgentDukeMultiTimeframe {
   const AgentDukeMultiTimeframe();
 
@@ -59,34 +65,35 @@ class AgentDukeMultiTimeframe {
 
     final scores = [s1, s5, s15];
 
-    final bullish = scores.where((score) => score >= 28).length;
-    final bearish = scores.where((score) => score <= -28).length;
+    final bullish = scores.where((score) => score > 0).length;
 
-    final weightedScore = (s1 * 0.50) + (s5 * 0.30) + (s15 * 0.20);
+    final bearish = scores.where((score) => score < 0).length;
 
-    final strongM1Bull = s1 >= 50 && s5 >= 20;
-    final strongM1Bear = s1 <= -50 && s5 <= -20;
+    // M1 dominates because this system forecasts 60 seconds.
+    final weightedScore = (s1 * 0.70) + (s5 * 0.20) + (s15 * 0.10);
 
-    String decision = 'WAIT';
+    String decision;
 
-    if (weightedScore >= 38 && (bullish >= 2 || strongM1Bull)) {
+    if (weightedScore > 0) {
       decision = 'BUY';
-    } else if (weightedScore <= -38 && (bearish >= 2 || strongM1Bear)) {
+    } else if (weightedScore < 0) {
       decision = 'SELL';
+    } else {
+      // Exact tie: M1 gets final vote.
+      decision = s1 >= 0 ? 'BUY' : 'SELL';
     }
 
     double alignmentBonus = 0;
 
     if (bullish == 3 || bearish == 3) {
-      alignmentBonus = 10;
+      alignmentBonus = 7;
     } else if (bullish == 2 || bearish == 2) {
-      alignmentBonus = 5;
-    } else if (strongM1Bull || strongM1Bear) {
-      alignmentBonus = 2;
+      alignmentBonus = 3;
     }
 
-    final confidence =
-        (weightedScore.abs() + alignmentBonus).clamp(0.0, 100.0).toDouble();
+    final confidence = (50.0 + (weightedScore.abs() * 0.40) + alignmentBonus)
+        .clamp(50.0, 95.0)
+        .toDouble();
 
     return DukeMultiTimeframeResult(
       symbol: symbol,
@@ -97,12 +104,12 @@ class AgentDukeMultiTimeframe {
       fifteenMinuteScore: s15,
       bullishTimeframes: bullish,
       bearishTimeframes: bearish,
-      explanation: 'Brain 3.0 M1-first analysis: '
+      explanation: 'Aggressive M1-first 60-second forecast: '
           '1M ${s1.toStringAsFixed(1)}, '
           '5M ${s5.toStringAsFixed(1)}, '
           '15M ${s15.toStringAsFixed(1)}. '
-          'Weighted score ${weightedScore.toStringAsFixed(1)}. '
-          'Decision: $decision.',
+          'Weighted direction ${weightedScore.toStringAsFixed(1)}. '
+          'Forecast: $decision.',
     );
   }
 }

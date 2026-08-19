@@ -157,6 +157,17 @@ class ScannerController {
       momentum: signal.momentum,
       setup: signal.setup,
       timestamp: signal.timestamp,
+      support: signal.support,
+      resistance: signal.resistance,
+      minEntry: signal.minEntry,
+      maxEntry: signal.maxEntry,
+      m1Score: signal.m1Score,
+      m5Score: signal.m5Score,
+      m15Score: signal.m15Score,
+      structureScore: signal.structureScore,
+      volatilityScore: signal.volatilityScore,
+      regime: signal.regime,
+      analysis: signal.analysis,
     );
   }
 

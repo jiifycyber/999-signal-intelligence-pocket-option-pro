@@ -14,3 +14,15 @@ build/
 .local_backups/
 lib/main.before_*.dart
 external/
+
+# Python virtual environments
+ai_super_engine/.venv/
+**/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local AI runtime data
+ai_super_engine/data/live_ticks.csv
+ai_super_engine/data/duke_live_forecasts.csv

@@ -20,6 +20,10 @@ class DukeAnalysis {
   });
 }
 
+/// Aggressive directional intelligence.
+///
+/// Duke must choose BUY or SELL.
+/// Confidence measures how decisive the choice is.
 class AgentDukeIntelligence {
   const AgentDukeIntelligence();
 
@@ -30,22 +34,15 @@ class AgentDukeIntelligence {
     required double volatility,
     required double structure,
   }) {
-    final score = (trend * 0.35) +
-        (momentum * 0.30) +
-        (structure * 0.25) +
-        (volatility * 0.10);
+    final score = (trend * 0.38) +
+        (momentum * 0.34) +
+        (structure * 0.20) +
+        (volatility * 0.08);
 
-    final confidence = score.abs().clamp(0.0, 100.0);
+    final decision = score >= 0 ? 'BUY' : 'SELL';
 
-    String decision;
-
-    if (score >= 60) {
-      decision = 'BUY';
-    } else if (score <= -60) {
-      decision = 'SELL';
-    } else {
-      decision = 'WAIT';
-    }
+    final confidence =
+        (50.0 + (score.abs() * 0.45)).clamp(50.0, 95.0).toDouble();
 
     return DukeAnalysis(
       symbol: symbol,
@@ -55,9 +52,10 @@ class AgentDukeIntelligence {
       momentumScore: momentum,
       volatilityScore: volatility,
       structureScore: structure,
-      explanation: 'Agent Duke Da Boss X analyzed trend, momentum, volatility, '
-          'and market structure. Composite intelligence score: '
-          '${score.toStringAsFixed(1)}.',
+      explanation: 'Agent Duke 60-second directional forecast: '
+          '$decision. Composite directional score '
+          '${score.toStringAsFixed(1)}. '
+          'Confidence measures relative forecast strength.',
     );
   }
 }

@@ -48,6 +48,18 @@ class DukeMasterResult {
   });
 }
 
+/// 999 / DUKE 60-SECOND FORECAST MASTER ENGINE
+///
+/// Direction and qualification are separated.
+///
+/// Direction:
+/// ALWAYS BUY or SELL when market analysis is available.
+///
+/// Quality:
+/// Used to rank and learn from signals.
+///
+/// The adaptive brain no longer has permission to replace
+/// Duke's directional answer with WAIT.
 class AgentDukeMasterEngine {
   final AgentDukeMultiTimeframe multiTimeframe;
   final AgentDukeTradeGate tradeGate;
@@ -64,7 +76,9 @@ class AgentDukeMasterEngine {
         signalMemory = signalMemory ?? AgentDukeSignalMemory(),
         adaptiveWeights = adaptiveWeights ?? DukeAdaptiveWeights();
 
-  DukeMasterResult analyze(DukeMasterInput input) {
+  DukeMasterResult analyze(
+    DukeMasterInput input,
+  ) {
     final timeframeResult = multiTimeframe.analyze(
       symbol: input.symbol,
       oneMinute: input.oneMinute,
@@ -89,6 +103,7 @@ class AgentDukeMasterEngine {
     );
 
     double conflictScore;
+
     if (timeframeResult.bullishTimeframes == 3 ||
         timeframeResult.bearishTimeframes == 3) {
       conflictScore = 8;
@@ -120,36 +135,55 @@ class AgentDukeMasterEngine {
       learningAdjustment: learningAdjustment,
     );
 
-    final finalApproved =
-        gateResult.tradeApproved && adaptiveDecision.qualified;
+    // ----------------------------------------------------------
+    // THE IMPORTANT CHANGE
+    //
+    // OLD:
+    // finalApproved ? BUY/SELL : WAIT
+    //
+    // NEW:
+    // Duke's best directional forecast always survives.
+    // ----------------------------------------------------------
+    final finalDecision = timeframeResult.decision == 'SELL' ? 'SELL' : 'BUY';
 
-    final finalDecision = finalApproved ? gateResult.finalDecision : 'WAIT';
+    // Ranking/quality can still use the adaptive engine.
+    final combinedQuality = ((adaptiveDecision.adaptiveScore * 0.60) +
+            (gateResult.qualityScore * 0.20) +
+            (timeframeResult.confidence * 0.20))
+        .clamp(0.0, 100.0)
+        .toDouble();
+
+    // Avoid flooding signal memory with every weak tick.
+    // This affects learning records ONLY.
+    // It does NOT remove BUY/SELL from the live scanner.
+    final recordForLearning =
+        adaptiveDecision.qualified && gateResult.tradeApproved;
 
     DukeSignalRecord? record;
 
-    if (finalApproved) {
+    if (recordForLearning) {
       record = signalMemory.recordSignal(
         symbol: input.symbol,
         decision: finalDecision,
-        confidence: adaptiveDecision.adaptiveScore,
+        confidence: combinedQuality,
         entryPrice: input.currentPrice,
       );
     }
 
-    final explanation = finalApproved
-        ? '999 Trading AI Brain 3.0 approved $finalDecision on '
-            '${input.symbol}. Tier ${adaptiveDecision.tier}. '
-            'Adaptive score ${adaptiveDecision.adaptiveScore.toStringAsFixed(1)}.'
-        : '999 Trading AI Brain 3.0 placed ${input.symbol} on WAIT. '
-            'Tier ${adaptiveDecision.tier}. '
-            'Adaptive score ${adaptiveDecision.adaptiveScore.toStringAsFixed(1)}.';
+    final explanation = 'Duke 60-second forecast: '
+        '$finalDecision ${input.symbol}. '
+        'M1-first confidence '
+        '${timeframeResult.confidence.toStringAsFixed(1)}%. '
+        'Adaptive quality '
+        '${combinedQuality.toStringAsFixed(1)}. '
+        'Quality affects ranking, not direction.';
 
     return DukeMasterResult(
       symbol: input.symbol,
       decision: finalDecision,
       confidence: timeframeResult.confidence,
-      qualityScore: adaptiveDecision.adaptiveScore,
-      tradeApproved: finalApproved,
+      qualityScore: combinedQuality,
+      tradeApproved: true,
       explanation: explanation,
       signalRecord: record,
     );

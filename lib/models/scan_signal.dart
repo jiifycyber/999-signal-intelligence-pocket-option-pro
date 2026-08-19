@@ -9,15 +9,50 @@ class ScanSignal {
   final TradeDirection direction;
   final double confidence;
   final double score;
+
   final double entry;
   final double stopLoss;
   final double takeProfit1;
   final double takeProfit2;
   final double takeProfit3;
+
   final String trend;
   final String momentum;
   final String setup;
   final DateTime timestamp;
+
+  // ============================================================
+  // ADVANCED MARKET INTELLIGENCE
+  // ============================================================
+
+  /// Real calculated structural support.
+  final double? support;
+
+  /// Real calculated structural resistance.
+  final double? resistance;
+
+  /// Dynamic preferred entry zone.
+  final double? minEntry;
+
+  final double? maxEntry;
+
+  /// Actual independently calculated timeframe scores.
+  /// Range: approximately -100 to +100.
+  final double m1Score;
+  final double m5Score;
+  final double m15Score;
+
+  /// Signed market structure score.
+  final double structureScore;
+
+  /// Volatility intensity/quality score, 0-100.
+  final double volatilityScore;
+
+  /// Detected market environment.
+  final String regime;
+
+  /// Human-readable explanation of the quantitative analysis.
+  final String analysis;
 
   const ScanSignal({
     required this.symbol,
@@ -33,77 +68,94 @@ class ScanSignal {
     required this.momentum,
     required this.setup,
     required this.timestamp,
+    this.support,
+    this.resistance,
+    this.minEntry,
+    this.maxEntry,
+    this.m1Score = 0,
+    this.m5Score = 0,
+    this.m15Score = 0,
+    this.structureScore = 0,
+    this.volatilityScore = 50,
+    this.regime = 'UNKNOWN',
+    this.analysis = '',
   });
 
-  /// Age of this signal using the live market timestamp.
   Duration get age => DateTime.now().difference(timestamp);
 
-  /// 1-minute trade signals must not remain actionable indefinitely.
   bool get isExpired => age.inSeconds >= 60;
 
-  /// Entry timing for the current 1-minute setup.
-  ///
-  /// 0-20 sec  = ideal entry window
-  /// 21-45 sec = wait for a fresh confirmation
-  /// 46-59 sec = skip because the setup is too late
-  /// 60+ sec   = expired
+  DateTime get entryTime => timestamp.toLocal();
+
+  DateTime get expirationTime =>
+      timestamp.add(const Duration(seconds: 60)).toLocal();
+
+  int get countdownSeconds {
+    final remaining = 60 - age.inSeconds;
+    return remaining.clamp(0, 60);
+  }
+
+  String _clockText(DateTime value) {
+    final local = value.toLocal();
+
+    int hour = local.hour;
+    final suffix = hour >= 12 ? 'PM' : 'AM';
+
+    if (hour == 0) {
+      hour = 12;
+    } else if (hour > 12) {
+      hour -= 12;
+    }
+
+    final minute = local.minute.toString().padLeft(2, '0');
+    final second = local.second.toString().padLeft(2, '0');
+
+    return '$hour:$minute:$second $suffix';
+  }
+
+  String get entryTimeText => _clockText(entryTime);
+
+  String get expirationTimeText => _clockText(expirationTime);
+
+  String get countdownText {
+    final seconds = countdownSeconds;
+    return '00:${seconds.toString().padLeft(2, '0')}';
+  }
+
   String get entryTimingText {
-    if (direction == TradeDirection.wait) return 'WAIT';
-
-    final seconds = age.inSeconds;
-
-    if (seconds < 0) return 'WAIT';
-    if (seconds <= 20) return 'ENTER NOW';
-    if (seconds <= 45) return 'WAIT';
-    if (seconds < 60) return 'SKIP';
-
-    return 'EXPIRED';
-  }
-
-  bool get canEnterNow =>
-      !isExpired &&
-      direction != TradeDirection.wait &&
-      confidence >= 70.0 &&
-      entryTimingText == 'ENTER NOW';
-
-  /// V3 setup-quality classification.
-  String get setupQuality {
-    if (confidence >= 90) return 'ELITE';
-    if (confidence >= 80) return 'STRONG';
-    if (confidence >= 70) return 'CONFIRMED';
-    if (confidence >= 60) return 'FORMING';
-    return 'WEAK';
-  }
-
-  /// V3 one-minute execution state.
-  String get executionState {
-    if (direction == TradeDirection.wait) {
-      if (confidence >= 60) return 'SETUP FORMING';
-      return 'WAIT';
-    }
-
     if (isExpired) return 'EXPIRED';
-
-    final seconds = age.inSeconds;
-
-    if (confidence < 70) return 'SETUP FORMING';
-    if (seconds <= 10) return 'GET READY';
-    if (seconds <= 20) return 'ENTER NOW';
-    if (seconds <= 45) return 'TOO LATE';
-
-    return 'SKIP';
-  }
-
-  String get directionText {
-    if (isExpired && direction != TradeDirection.wait) {
-      return 'SKIP • EXPIRED';
-    }
 
     switch (direction) {
       case TradeDirection.buy:
-        return 'BUY • $entryTimingText';
       case TradeDirection.sell:
-        return 'SELL • $entryTimingText';
+        return 'ENTER NOW';
+      case TradeDirection.wait:
+        return 'NO LIVE DATA';
+    }
+  }
+
+  bool get canEnterNow => !isExpired && direction != TradeDirection.wait;
+
+  String get setupQuality {
+    if (confidence >= 85) return 'ELITE';
+    if (confidence >= 75) return 'STRONG';
+    if (confidence >= 65) return 'GOOD';
+    if (confidence >= 55) return 'AGGRESSIVE';
+    return 'LOW EDGE';
+  }
+
+  String get executionState {
+    if (direction == TradeDirection.wait) return 'NO LIVE DATA';
+    if (isExpired) return 'EXPIRED';
+    return 'ENTER NOW';
+  }
+
+  String get directionText {
+    switch (direction) {
+      case TradeDirection.buy:
+        return 'BUY';
+      case TradeDirection.sell:
+        return 'SELL';
       case TradeDirection.wait:
         return 'WAIT';
     }

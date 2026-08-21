@@ -6,6 +6,17 @@ import 'package:flutter/material.dart';
 import '../models/scan_signal.dart';
 import '../ai/agent_duke_master_engine.dart';
 import '../services/scanner_controller.dart';
+import '../platform/tools/tools_center.dart';
+import '../platform/tools/risk_tools_screen.dart';
+import '../platform/tools/intelligence_tools_screen.dart';
+import '../platform/tools/advanced_chart/advanced_chart_screen.dart';
+import '../platform/tools/advanced_chart/chart_layouts_screen.dart';
+import '../platform/tools/advanced_chart/chart_replay_screen.dart';
+import '../platform/tools/advanced_chart/chart_alerts_screen.dart';
+import '../platform/tools/advanced_chart/indicator_center_screen.dart';
+import '../platform/tools/advanced_chart/drawing_tools_screen.dart';
+import '../platform/tools/advanced_chart/multi_chart_screen.dart';
+import '../platform/tools/advanced_chart/chart_tick_store.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:passkeys/authenticator.dart';
 
@@ -167,6 +178,15 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
 
           final history = histories.putIfAbsent(symbol, () => <double>[]);
           history.add(quote.price);
+
+          // Preserve the original Pocket Option market timestamp.
+          // This keeps M1 candle boundaries aligned with the source feed
+          // instead of rebuilding them from the browser's local clock.
+          ChartTickStore.add(
+            symbol,
+            quote.price,
+            time: quote.timestamp,
+          );
 
           if (history.length > 120) {
             history.removeAt(0);
@@ -2313,7 +2333,148 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     );
   }
 
+  void _openAdvancedChartModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdvancedChartScreen(
+          symbolProvider: () => selectedPair,
+          timeframeProvider: () => timeframe,
+          priceProvider: () => _priceFor(selectedPair) ?? 0.0,
+          historyProvider: () => List<double>.from(
+            _historyFor(selectedPair),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openMultiChartModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MultiChartScreen(
+          initialSymbol: selectedPair,
+          initialTimeframe: timeframe,
+        ),
+      ),
+    );
+  }
+
+  void _openDrawingToolsModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const DrawingToolsScreen(),
+      ),
+    );
+  }
+
+  void _openIndicatorCenterModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const IndicatorCenterScreen(),
+      ),
+    );
+  }
+
+  void _openChartAlertsModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChartAlertsScreen(
+          symbol: selectedPair,
+          timeframe: timeframe,
+          price: _priceFor(selectedPair) ?? 0.0,
+        ),
+      ),
+    );
+  }
+
+  void _openChartReplayModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChartReplayScreen(
+          symbol: selectedPair,
+          timeframe: timeframe,
+        ),
+      ),
+    );
+  }
+
+  void _openChartLayoutsModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ChartLayoutsScreen(),
+      ),
+    );
+  }
+
+  void _openRiskToolsModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RiskToolsScreen(
+          liveModeProvider: () => liveMode,
+        ),
+      ),
+    );
+  }
+
+  void _openIntelligenceCenterModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => IntelligenceToolsScreen(
+          signalsProvider: () => List<dynamic>.from(liveSignals),
+          outcomesProvider: () => List<dynamic>.from(
+            scannerController.intelligenceStore.tradeOutcomes,
+          ),
+          weightsProvider: () {
+            final raw = scannerController.dukeBridge.duke.learningWeights();
+
+            return raw.map(
+              (key, value) => MapEntry(
+                key.toString(),
+                (value as num).toDouble(),
+              ),
+            );
+          },
+          connectedProvider: () => connected,
+          liveModeProvider: () => liveMode,
+          pendingProvider: () => scannerController.pendingPredictions,
+          pairProvider: () => selectedPair,
+          onDeepScan: () {
+            _showDukeRanking(
+              scannerController.deepScanAll(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   void _openToolsModule() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ToolsCenter(
+          onOpenAdvancedChart: _openAdvancedChartModule,
+          onOpenMultiChart: _openMultiChartModule,
+          onOpenDrawingTools: _openDrawingToolsModule,
+          onOpenIndicatorCenter: _openIndicatorCenterModule,
+          onOpenChartAlerts: _openChartAlertsModule,
+          onOpenChartReplay: _openChartReplayModule,
+          onOpenChartLayouts: _openChartLayoutsModule,
+          onOpenLiveIntelligenceTools: () {
+            _openLegacyIntelligenceTools();
+          },
+          onOpenDeepScan: () {
+            _showDukeRanking(
+              scannerController.deepScanAll(),
+            );
+          },
+          onOpenRiskTools: _openRiskToolsModule,
+          onOpenIntelligenceCenter: _openIntelligenceCenterModule,
+        ),
+      ),
+    );
+  }
+
+  void _openLegacyIntelligenceTools() {
     final weights = scannerController.dukeBridge.duke.learningWeights();
 
     _showFunctionWindow(

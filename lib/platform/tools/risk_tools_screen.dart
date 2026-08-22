@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../ui/intelligence_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../platform_shell.dart';
 
-const cyan = Color(0xFF13D8FF);
-const green = Color(0xFF16E0A0);
-const amber = Color(0xFFFFB84D);
-const red = Color(0xFFFF5B69);
-const panel = Color(0xFF07131E);
+const cyan = IntelligenceTheme.cyan;
+const green = IntelligenceTheme.green;
+const amber = IntelligenceTheme.amber;
+const red = IntelligenceTheme.red;
+const panel = IntelligenceTheme.panel;
 
 class RiskToolsScreen extends StatefulWidget {
   final bool Function() liveModeProvider;

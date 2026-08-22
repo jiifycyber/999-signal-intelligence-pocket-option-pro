@@ -51,6 +51,10 @@ class State:
 
         self.last_emitted = {}
 
+        # Rolling server-side M1 OHLC history built from the same
+        # Pocket Option prices already feeding /ws/po.
+        self.m1_candles = {}
+
 
 state = State()
 
@@ -175,6 +179,104 @@ async def broadcast(payload: dict):
         state.clients.discard(client)
 
 
+def normalize_tick_timestamp(value: Any) -> float:
+    now = time.time()
+
+    if value is None:
+        return now
+
+    try:
+        ts = float(value)
+
+        # Convert millisecond timestamps to seconds.
+        if ts > 10_000_000_000:
+            ts = ts / 1000.0
+
+        if ts <= 0:
+            return now
+
+        return ts
+
+    except Exception:
+        return now
+
+
+def update_m1_candle(
+    symbol: str,
+    price: float,
+    timestamp: Any = None,
+):
+    ts = normalize_tick_timestamp(timestamp)
+
+    # Exact Unix M1 boundary.
+    bucket = int(ts // 60) * 60
+
+    candles = state.m1_candles.setdefault(
+        symbol,
+        [],
+    )
+
+    # Pocket Option packets can be parsed out of chronological order.
+    # Merge by the actual M1 bucket instead of assuming the newest list
+    # element always belongs to the incoming tick.
+    candle = next(
+        (
+            item
+            for item in candles
+            if item["timestamp"] == bucket
+        ),
+        None,
+    )
+
+    if candle is None:
+        candles.append({
+            "timestamp": bucket,
+            "open": price,
+            "high": price,
+            "low": price,
+            "close": price,
+            "_first_tick_ts": ts,
+            "_last_tick_ts": ts,
+        })
+    else:
+        candle["high"] = max(
+            candle["high"],
+            price,
+        )
+
+        candle["low"] = min(
+            candle["low"],
+            price,
+        )
+
+        first_tick_ts = candle.get(
+            "_first_tick_ts",
+            float(bucket),
+        )
+
+        last_tick_ts = candle.get(
+            "_last_tick_ts",
+            float(bucket),
+        )
+
+        if ts < first_tick_ts:
+            candle["open"] = price
+            candle["_first_tick_ts"] = ts
+
+        if ts >= last_tick_ts:
+            candle["close"] = price
+            candle["_last_tick_ts"] = ts
+
+    candles.sort(
+        key=lambda item: item["timestamp"]
+    )
+
+    # Keep deep UNIQUE M1 history for professional chart navigation.
+    if len(candles) > 240:
+        del candles[:-240]
+
+
+
 async def emit_price(
     symbol: str,
     price: float,
@@ -227,6 +329,13 @@ async def emit_price(
     )
 
     state.symbol_last_seen[symbol] = now
+
+    # Build M1 OHLC from the exact same accepted Pocket Option tick.
+    update_m1_candle(
+        symbol,
+        price,
+        timestamp,
+    )
 
     payload = {
         "event": "price",
@@ -715,6 +824,56 @@ async def prices():
     return {
         "source": "pocket_option_browser",
         "prices": state.latest_prices,
+    }
+
+
+
+@app.get("/history/{symbol}")
+async def history(
+    symbol: str,
+    count: int = 60,
+):
+    normalized = normalize_symbol(symbol)
+
+    if not normalized:
+        return {
+            "source": "pocket_option_browser",
+            "symbol": symbol,
+            "timeframe": 60,
+            "count": 0,
+            "candles": [],
+        }
+
+    count = max(
+        1,
+        min(count, 240),
+    )
+
+    candles = state.m1_candles.get(
+        normalized,
+        [],
+    )
+
+    selected = candles[-count:]
+
+    # Internal tick-order metadata is never exposed to chart clients.
+    rows = [
+        {
+            "timestamp": candle["timestamp"],
+            "open": candle["open"],
+            "high": candle["high"],
+            "low": candle["low"],
+            "close": candle["close"],
+        }
+        for candle in selected
+    ]
+
+    return {
+        "source": "pocket_option_browser",
+        "symbol": normalized,
+        "timeframe": 60,
+        "count": len(rows),
+        "candles": rows,
     }
 
 

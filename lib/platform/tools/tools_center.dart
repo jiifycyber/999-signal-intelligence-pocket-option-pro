@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/intelligence_theme.dart';
 import '../platform_shell.dart';
 
 class ToolsCenter extends StatelessWidget {
@@ -100,17 +101,6 @@ class ToolsCenter extends StatelessWidget {
   }
 
   static Widget _section(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF13D8FF),
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.4,
-        ),
-      ),
-    );
+    return IntelligenceSectionTitle(title);
   }
 }

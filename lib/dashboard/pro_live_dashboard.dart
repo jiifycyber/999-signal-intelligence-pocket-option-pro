@@ -1,10 +1,14 @@
 import 'dart:async';
+import '../ai/agent_duke_global_controller.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 
 import '../models/scan_signal.dart';
 import '../ai/agent_duke_master_engine.dart';
+import '../ai/agent_duke_command.dart';
+import '../ai/agent_duke_command_router.dart';
+import '../ai/agent_duke_voice_controller.dart';
 import '../services/scanner_controller.dart';
 import '../platform/tools/tools_center.dart';
 import '../platform/tools/risk_tools_screen.dart';
@@ -91,6 +95,16 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
 
   late final ScannerController scannerController;
 
+  late final AgentDukeVoiceController dukeVoice;
+
+  final AgentDukeCommandRouter dukeCommandRouter =
+      const AgentDukeCommandRouter();
+
+  final TextEditingController dukeCommandController = TextEditingController();
+
+  String dukeAssistantResponse =
+      'Agent Duke is online. Type a command or tap the microphone.';
+
   StreamSubscription<List<ScanSignal>>? signalSubscription;
   StreamSubscription? quoteSubscription;
 
@@ -125,6 +139,11 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     super.initState();
 
     scannerController = ScannerController();
+
+    dukeVoice = AgentDukeVoiceController();
+    _registerGlobalDukeActions();
+    dukeVoice.addListener(_onDukeVoiceChanged);
+    dukeVoice.initialize();
 
     signalSubscription = scannerController.signalStream.listen((signals) {
       if (!mounted) return;
@@ -202,8 +221,15 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
 
   @override
   void dispose() {
+    AgentDukeGlobalController.instance.unregisterOwner(this);
+
     signalSubscription?.cancel();
     quoteSubscription?.cancel();
+
+    dukeVoice.removeListener(_onDukeVoiceChanged);
+    dukeVoice.dispose();
+    dukeCommandController.dispose();
+
     scannerController.dispose();
     super.dispose();
   }
@@ -437,6 +463,11 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
 
   void _setTimeframe(String value) {
     scannerController.marketDataService.setTimeframe(value);
+    AgentDukeGlobalController.instance.updateContext(
+      symbol: selectedPair,
+      timeframe: value,
+      page: selectedNav,
+    );
 
     setState(() {
       timeframe = value;
@@ -5056,6 +5087,774 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
     );
   }
 
+  void _onDukeVoiceChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _registerGlobalDukeActions() {
+    final globalDuke = AgentDukeGlobalController.instance;
+
+    globalDuke.updateContext(
+      page: selectedNav,
+      symbol: selectedPair,
+      timeframe: timeframe,
+    );
+
+    globalDuke.registerActions(
+      owner: this,
+      actions: {
+        'navigate_back': (_) async {
+          final nav = globalDuke.navigatorKey.currentState;
+
+          if (nav != null && nav.canPop()) {
+            nav.pop();
+            return 'Going back one page.';
+          }
+
+          return 'You are already at the main application level.';
+        },
+        'open_scanner': (_) async {
+          final nav = globalDuke.navigatorKey.currentState;
+
+          if (nav != null) {
+            nav.popUntil((route) => route.isFirst);
+          }
+
+          if (mounted) {
+            setState(() {
+              selectedNav = 'AI SCANNER';
+            });
+          }
+
+          globalDuke.updateContext(
+            page: 'AI SCANNER',
+            symbol: selectedPair,
+            timeframe: timeframe,
+          );
+
+          return 'Scanner is open.';
+        },
+        'set_pair': (args) async {
+          final pair = (args['symbol'] ?? '').toString().trim().toUpperCase();
+
+          if (pair.isEmpty) {
+            return 'Tell me which pair you want.';
+          }
+
+          if (mounted) {
+            setState(() {
+              selectedPair = pair;
+            });
+          }
+
+          globalDuke.updateContext(symbol: pair);
+
+          return 'Switched to $pair.';
+        },
+        'set_timeframe': (args) async {
+          final frame =
+              (args['timeframe'] ?? '').toString().trim().toUpperCase();
+
+          if (frame.isEmpty) {
+            return 'Tell me which timeframe you want.';
+          }
+
+          _setTimeframe(frame);
+
+          globalDuke.updateContext(
+            symbol: selectedPair,
+            timeframe: frame,
+          );
+
+          return 'Switched $selectedPair to $frame.';
+        },
+        'deep_scan': (_) async {
+          final result = scannerController.deepScan(selectedPair);
+
+          if (result == null) {
+            return 'I do not have enough current market data to deep scan $selectedPair yet.';
+          }
+
+          return 'Deep scan complete for $selectedPair. '
+              'Direction ${result.decision}. '
+              'Confidence ${result.confidence.toStringAsFixed(1)} percent. '
+              'Quality ${result.qualityScore.toStringAsFixed(1)}.';
+        },
+        'scan_all': (_) async {
+          final results = scannerController.deepScanAll();
+
+          if (results.isEmpty) {
+            return 'I do not have enough current market data to rank the pairs yet.';
+          }
+
+          final ranked = List.of(results)
+            ..sort(
+              (a, b) => b.qualityScore.compareTo(a.qualityScore),
+            );
+
+          final strongest = ranked
+              .take(5)
+              .map(
+                (r) =>
+                    '${r.symbol} ${r.decision} ${r.qualityScore.toStringAsFixed(0)}',
+              )
+              .join(', ');
+
+          return 'Market ranking complete. Strongest setups: $strongest.';
+        },
+        'explain_signal': (_) async {
+          var result = scannerController.dukeResults[selectedPair];
+
+          result ??= scannerController.deepScan(selectedPair);
+
+          if (result == null) {
+            return 'I am monitoring $selectedPair, but I do not have enough current scanner information to explain a signal yet.';
+          }
+
+          return 'My current $selectedPair read is '
+              '${result.decision}. ${result.explanation}';
+        },
+        'open_advanced_chart': (_) async {
+          _openAdvancedChartModule();
+          return 'Opening the advanced chart for $selectedPair on $timeframe.';
+        },
+        'open_multi_chart': (_) async {
+          _openMultiChartModule();
+          return 'Opening multi-chart analysis.';
+        },
+        'open_drawings': (_) async {
+          _openDrawingToolsModule();
+          return 'Opening drawing tools.';
+        },
+        'open_indicators': (_) async {
+          _openIndicatorCenterModule();
+          return 'Opening the indicator center.';
+        },
+        'open_alerts': (_) async {
+          _openAlertsModule();
+          return 'Opening alerts.';
+        },
+        'open_replay': (_) async {
+          _openChartReplayModule();
+          return 'Opening replay for $selectedPair.';
+        },
+        'open_layouts': (_) async {
+          _openChartLayoutsModule();
+          return 'Opening chart layouts.';
+        },
+        'open_risk_tools': (_) async {
+          _openRiskToolsModule();
+          return 'Opening risk tools.';
+        },
+        'open_intelligence': (_) async {
+          _openIntelligenceCenterModule();
+          return 'Opening the intelligence center.';
+        },
+        'open_tools': (_) async {
+          _openToolsModule();
+          return 'Opening the tools center.';
+        },
+        'open_markets': (_) async {
+          _openNavModule('MARKETS');
+          return 'Opening markets.';
+        },
+        'open_analytics': (_) async {
+          _openNavModule('ANALYTICS');
+          return 'Opening analytics.';
+        },
+        'open_tracker': (_) async {
+          _openNavModule('TRACKER');
+          return 'Opening the trade tracker.';
+        },
+        'natural_command': (args) async {
+          final text = (args['text'] ?? '').toString();
+
+          if (text.trim().isEmpty) {
+            return 'Tell me what you need.';
+          }
+
+          await _executeDukeCommand(text);
+
+          return 'Agent Duke processed your command through the dashboard intelligence system.';
+        },
+      },
+    );
+  }
+
+  Future<void> _startOrStopDukeVoice() async {
+    if (dukeVoice.state == DukeVoiceState.listening) {
+      await dukeVoice.stopListening();
+      return;
+    }
+
+    await dukeVoice.startListening(
+      (text) {
+        dukeCommandController.text = text;
+        _executeDukeCommand(text);
+      },
+    );
+  }
+
+  Future<void> _setDukeResponse(
+    String message, {
+    bool speak = true,
+  }) async {
+    if (!mounted) return;
+
+    setState(() {
+      dukeAssistantResponse = message;
+    });
+
+    if (speak) {
+      await dukeVoice.speak(message);
+    } else {
+      dukeVoice.finishProcessing();
+    }
+  }
+
+  Future<void> _executeDukeCommand(String rawText) async {
+    final text = rawText.trim();
+
+    if (text.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+
+    dukeVoice.setProcessing();
+
+    final command = dukeCommandRouter.interpret(text);
+
+    try {
+      switch (command.type) {
+        case DukeCommandType.selectPair:
+          final pair = command.value;
+
+          if (pair == null || pair.isEmpty) {
+            await _setDukeResponse(
+              'I could not identify the pair you want.',
+            );
+            break;
+          }
+
+          setState(() {
+            selectedPair = pair;
+          });
+
+          await _setDukeResponse(
+            'Switched to $pair. I am now monitoring $pair on $timeframe.',
+          );
+          break;
+
+        case DukeCommandType.setTimeframe:
+          final nextTimeframe = command.value;
+
+          if (nextTimeframe == null || nextTimeframe.isEmpty) {
+            await _setDukeResponse(
+              'I could not identify the timeframe.',
+            );
+            break;
+          }
+
+          _setTimeframe(nextTimeframe);
+
+          await _setDukeResponse(
+            'Timeframe changed to $nextTimeframe for $selectedPair.',
+          );
+          break;
+
+        case DukeCommandType.deepScan:
+          final result = scannerController.deepScan(selectedPair);
+
+          if (result == null) {
+            await _setDukeResponse(
+              'I do not have enough synchronized data to deep scan '
+              '$selectedPair yet.',
+            );
+            break;
+          }
+
+          _showDukeResult(result);
+
+          await _setDukeResponse(
+            'Deep scan complete for $selectedPair. '
+            'My direction is ${result.decision} with '
+            '${result.confidence.toStringAsFixed(1)} percent confidence '
+            'and ${result.qualityScore.toStringAsFixed(1)} quality.',
+          );
+          break;
+
+        case DukeCommandType.scanAll:
+          final results = scannerController.deepScanAll();
+
+          if (results.isEmpty) {
+            await _setDukeResponse(
+              'I do not have enough synchronized data to rank the markets yet.',
+            );
+            break;
+          }
+
+          final ranked = List<DukeMasterResult>.from(results)
+            ..sort(
+              (a, b) => b.qualityScore.compareTo(a.qualityScore),
+            );
+
+          final best = ranked.first;
+
+          _showDukeRanking(results);
+
+          await _setDukeResponse(
+            'Market scan complete. I evaluated ${results.length} markets. '
+            'The current highest-quality setup is ${best.symbol}, '
+            '${best.decision}, with '
+            '${best.confidence.toStringAsFixed(1)} percent confidence '
+            'and ${best.qualityScore.toStringAsFixed(1)} quality.',
+          );
+          break;
+
+        case DukeCommandType.openChart:
+          await _setDukeResponse(
+            'Opening the advanced chart for $selectedPair on $timeframe.',
+          );
+
+          if (!mounted) return;
+          _openAdvancedChartModule();
+          break;
+
+        case DukeCommandType.analyze:
+          var result = scannerController.dukeResults[selectedPair];
+
+          result ??= scannerController.deepScan(selectedPair);
+
+          if (result == null) {
+            await _setDukeResponse(
+              'I am still building enough market history to analyze '
+              '$selectedPair.',
+            );
+            break;
+          }
+
+          await _setDukeResponse(
+            'My current read on $selectedPair is ${result.decision}. '
+            'Confidence is ${result.confidence.toStringAsFixed(1)} percent. '
+            'Adaptive quality is ${result.qualityScore.toStringAsFixed(1)}. '
+            '${result.explanation}',
+          );
+          break;
+
+        case DukeCommandType.liquidity:
+        case DukeCommandType.supportResistance:
+        case DukeCommandType.fibonacci:
+        case DukeCommandType.patterns:
+        case DukeCommandType.breakout:
+          await _setDukeResponse(
+            'I understand the chart-analysis request. '
+            'Opening $selectedPair on the advanced chart. '
+            'Direct chart-tool execution is the next Duke control layer.',
+          );
+
+          if (!mounted) return;
+          _openAdvancedChartModule();
+          break;
+
+        case DukeCommandType.addIndicator:
+        case DukeCommandType.removeIndicator:
+          await _setDukeResponse(
+            'Indicator command recognized. '
+            'Direct indicator control is being connected to the chart engine next.',
+          );
+          break;
+
+        case DukeCommandType.conversation:
+          final result = scannerController.dukeResults[selectedPair];
+
+          if (result != null) {
+            await _setDukeResponse(
+              'I am monitoring $selectedPair on $timeframe. '
+              'My current direction is ${result.decision}, '
+              'confidence ${result.confidence.toStringAsFixed(1)} percent, '
+              'quality ${result.qualityScore.toStringAsFixed(1)}. '
+              'You can tell me to switch pairs, change timeframe, '
+              'deep scan, scan all markets, analyze the market, '
+              'or open the advanced chart.',
+            );
+          } else {
+            await _setDukeResponse(
+              'I am online and monitoring $selectedPair on $timeframe. '
+              'Tell me to scan this pair, scan all markets, '
+              'switch pairs, change timeframe, or open the chart.',
+            );
+          }
+          break;
+
+        case DukeCommandType.unknown:
+          await _setDukeResponse(
+            'I did not understand that command yet. '
+            'Try asking me to scan this pair, scan all markets, '
+            'switch to EURUSD, set M1, analyze the market, '
+            'or open the advanced chart.',
+          );
+          break;
+      }
+    } catch (e) {
+      await _setDukeResponse(
+        'I could not complete that command. ${e.toString()}',
+      );
+    } finally {
+      dukeCommandController.clear();
+    }
+  }
+
+  Widget _dukeInteractiveCommandBox() {
+    final duke = AgentDukeGlobalController.instance;
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        duke,
+        duke.voice,
+      ]),
+      builder: (context, _) {
+        final voice = duke.voice;
+
+        final listening = voice.state == DukeVoiceState.listening;
+
+        final processing =
+            duke.busy || voice.state == DukeVoiceState.processing;
+
+        final speaking = voice.state == DukeVoiceState.speaking;
+
+        final unavailable = voice.state == DukeVoiceState.unavailable;
+
+        Future<void> submitCommand([
+          String? supplied,
+        ]) async {
+          final text = (supplied ?? dukeCommandController.text).trim();
+
+          if (text.isEmpty || duke.busy) {
+            return;
+          }
+
+          dukeCommandController.clear();
+
+          duke.updateContext(
+            page: 'AI SCANNER',
+            symbol: selectedPair,
+            timeframe: timeframe,
+          );
+
+          await duke.submit(text);
+        }
+
+        String statusLabel;
+
+        if (unavailable) {
+          statusLabel = 'VOICE OFF';
+        } else if (listening) {
+          statusLabel = 'LISTENING';
+        } else if (processing) {
+          statusLabel = 'THINKING';
+        } else if (speaking) {
+          statusLabel = 'SPEAKING';
+        } else if (voice.wakeListening) {
+          statusLabel = 'WAKE MODE';
+        } else {
+          statusLabel = 'READY';
+        }
+
+        return _dukeBox(
+          borderColor: listening
+              ? green.withValues(alpha: .75)
+              : purple.withValues(alpha: .55),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'AGENT DUKE ASSISTANT',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: listening
+                          ? green.withValues(
+                              alpha: .12,
+                            )
+                          : purple.withValues(
+                              alpha: .06,
+                            ),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: listening
+                            ? green
+                            : cyan.withValues(
+                                alpha: .35,
+                              ),
+                      ),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
+                        color: unavailable
+                            ? red
+                            : listening
+                                ? green
+                                : processing
+                                    ? purple
+                                    : cyan,
+                        fontSize: 6.3,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(
+                  minHeight: 38,
+                  maxHeight: 58,
+                ),
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: .18),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: Colors.white10,
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    listening && voice.transcript.trim().isNotEmpty
+                        ? 'YOU: ${voice.transcript}'
+                        : duke.lastResponse.trim().isEmpty
+                            ? 'Agent Duke is ready.'
+                            : duke.lastResponse,
+                    style: TextStyle(
+                      color: listening ? green : Colors.white70,
+                      fontSize: 7.3,
+                      height: 1.30,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 5),
+              SizedBox(
+                height: 33,
+                child: TextField(
+                  controller: dukeCommandController,
+                  enabled: !duke.busy,
+                  onSubmitted: (value) {
+                    submitCommand(value);
+                  },
+                  textInputAction: TextInputAction.send,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                  ),
+                  decoration: InputDecoration(
+                    hintText:
+                        listening ? 'Listening...' : 'Ask Duke anything...',
+                    hintStyle: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 7.3,
+                    ),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.black.withValues(alpha: .16),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5),
+                      borderSide: BorderSide(
+                        color: cyan.withValues(
+                          alpha: .45,
+                        ),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5),
+                      borderSide: const BorderSide(
+                        color: cyan,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: duke.busy
+                          ? null
+                          : () async {
+                              duke.updateContext(
+                                page: 'AI SCANNER',
+                                symbol: selectedPair,
+                                timeframe: timeframe,
+                              );
+
+                              await duke.toggleVoice();
+                            },
+                      icon: Icon(
+                        unavailable
+                            ? Icons.mic_off
+                            : listening
+                                ? Icons.stop_circle_outlined
+                                : Icons.mic_none,
+                        size: 15,
+                      ),
+                      label: Text(
+                        listening ? 'STOP' : 'MIC',
+                        style: const TextStyle(
+                          fontSize: 7,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 30),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                        ),
+                        foregroundColor: listening ? green : cyan,
+                        side: BorderSide(
+                          color: listening
+                              ? green
+                              : cyan.withValues(
+                                  alpha: .60,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: duke.busy ? null : () => submitCommand(),
+                      icon: const Icon(
+                        Icons.send,
+                        size: 14,
+                      ),
+                      label: const Text(
+                        'SEND',
+                        style: TextStyle(
+                          fontSize: 7,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 30),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                        ),
+                        foregroundColor: purple,
+                        side: BorderSide(
+                          color: purple.withValues(
+                            alpha: .60,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  Expanded(
+                    child: _dukeQuickCommand(
+                      'ANALYZE',
+                      'Analyze $selectedPair on $timeframe',
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _dukeQuickCommand(
+                      'DEEP SCAN',
+                      'Deep scan $selectedPair',
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _dukeQuickCommand(
+                      'SCAN ALL',
+                      'Scan all markets',
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _dukeQuickCommand(
+                      'CHART',
+                      'Open advanced chart',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _dukeQuickCommand(
+    String label,
+    String command,
+  ) {
+    final duke = AgentDukeGlobalController.instance;
+
+    return InkWell(
+      onTap: duke.busy
+          ? null
+          : () async {
+              duke.updateContext(
+                page: 'AI SCANNER',
+                symbol: selectedPair,
+                timeframe: timeframe,
+              );
+
+              await duke.submit(command);
+            },
+      borderRadius: BorderRadius.circular(5),
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 4,
+          vertical: 5,
+        ),
+        decoration: BoxDecoration(
+          color: cyan.withValues(alpha: .05),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(
+            color: cyan.withValues(alpha: .18),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 6.2,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _dukePanel() {
     final signal = _signalFor(selectedPair);
     final duke = scannerController.dukeResults[selectedPair];
@@ -5086,8 +5885,8 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
       glow: true,
       padding: const EdgeInsets.all(8),
       borderColor: cyan.withValues(alpha: 0.78),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: ListView(
+        padding: EdgeInsets.zero,
         children: [
           Row(
             children: [
@@ -5376,6 +6175,8 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
             ),
           ),
           const SizedBox(height: 5),
+          _dukeInteractiveCommandBox(),
+          const SizedBox(height: 5),
           _dukeBox(
             borderColor: directionColor.withValues(alpha: 0.55),
             child: SizedBox(
@@ -5449,50 +6250,48 @@ class _ProLiveDashboardState extends State<ProLiveDashboard> {
             ],
           ),
           const SizedBox(height: 5),
-          Expanded(
-            child: _dukeBox(
-              borderColor: purple.withValues(alpha: 0.35),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'LIVE INTELLIGENCE FEED',
-                          style: TextStyle(
-                            color: cyan,
-                            fontSize: 7,
-                            fontWeight: FontWeight.w900,
-                          ),
+          _dukeBox(
+            borderColor: purple.withValues(alpha: 0.35),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'LIVE INTELLIGENCE FEED',
+                        style: TextStyle(
+                          color: cyan,
+                          fontSize: 7,
+                          fontWeight: FontWeight.w900,
                         ),
-                        const Spacer(),
-                        Text(
-                          duke == null
-                              ? 'WAIT'
-                              : duke.tradeApproved
-                                  ? 'ACTIVE'
-                                  : 'MONITORING',
-                          style: TextStyle(
-                            color: duke?.tradeApproved == true ? green : amber,
-                            fontSize: 6.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      duke?.explanation ??
-                          'Trading Brain 3.0 is monitoring the live market feed and waiting for a qualified setup.',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        height: 1.35,
                       ),
+                      const Spacer(),
+                      Text(
+                        duke == null
+                            ? 'WAIT'
+                            : duke.tradeApproved
+                                ? 'ACTIVE'
+                                : 'MONITORING',
+                        style: TextStyle(
+                          color: duke?.tradeApproved == true ? green : amber,
+                          fontSize: 6.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    duke?.explanation ??
+                        'Trading Brain 3.0 is monitoring the live market feed and waiting for a qualified setup.',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 8,
+                      height: 1.35,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

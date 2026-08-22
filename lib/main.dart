@@ -1,7 +1,6 @@
+import 'ai/agent_duke_global_controller.dart';
+import 'ai/agent_duke_global_panel.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'login_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'login_screen.dart';
 import 'login_screen.dart';
 import 'dart:async';
 
@@ -32,6 +31,22 @@ class NexusApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: AgentDukeGlobalController.instance.navigatorKey,
+      builder: (context, child) {
+        final appChild = child ?? const SizedBox.shrink();
+
+        // Duke is an authenticated application operator.
+        // Keep the login screen clean.
+        final session = Supabase.instance.client.auth.currentSession;
+
+        if (session == null) {
+          return appChild;
+        }
+
+        return AgentDukeGlobalPanel(
+          child: appChild,
+        );
+      },
       debugShowCheckedModeBanner: false,
       title: '999 Signal Intelligence 2.0',
       theme: ThemeData.dark(),
@@ -71,6 +86,7 @@ class _NexusDashboardState extends State<NexusDashboard> {
     pairs.sort();
     return pairs;
   }
+
   bool scannerConnected = false;
   MarketMode marketMode = MarketMode.demo;
 
@@ -1744,7 +1760,7 @@ class _NexusDashboardState extends State<NexusDashboard> {
                             color: const Color(0xEE07111F),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: Colors.cyanAccent.withOpacity(0.35),
+                              color: Colors.cyanAccent.withValues(alpha: 0.35),
                             ),
                           ),
                           child: Column(
@@ -1882,7 +1898,7 @@ class _NexusDashboardState extends State<NexusDashboard> {
                                               border: Border(
                                                 bottom: BorderSide(
                                                   color: Colors.white
-                                                      .withOpacity(0.06),
+                                                      .withValues(alpha: 0.06),
                                                 ),
                                               ),
                                             ),

@@ -145,16 +145,9 @@ def is_plausible_market_price(
             if not (0.05 <= price <= 5.0):
                 return False
 
-    # If we already have a real price for this symbol, reject absurd jumps.
-    previous = state.latest_prices.get(symbol)
-
-    if previous is not None and previous > 0:
-        change = abs(price - previous) / previous
-
-        # A 5% instantaneous FX move is not a normal tick.
-        if change > 0.05:
-            return False
-
+    # Do not reject a valid market price solely because it moved sharply.
+    # Weekend gaps, reconnects, OTC instruments, crypto and other markets
+    # can legitimately move beyond the old FX-only 5% threshold.
     return True
 
 
